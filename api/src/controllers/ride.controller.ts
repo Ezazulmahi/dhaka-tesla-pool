@@ -9,9 +9,12 @@ export const rideController = {
   },
 
   async create(req: Request, res: Response) {
-    const { ride, coRiders } = await rideService.requestRide(req.user!.id, createRideSchema.parse(req.body));
-    req.log.info({ rideId: ride.id, status: ride.status, poolId: ride.pool_id }, 'ride requested');
-    res.status(201).json({ ride: passengerRideView(ride, coRiders) });
+    const { ride, coRiders, matchOutcome } = await rideService.requestRide(
+      req.user!.id,
+      createRideSchema.parse(req.body),
+    );
+    req.log.info({ rideId: ride.id, poolId: ride.pool_id, matchOutcome }, 'ride requested');
+    res.status(201).json({ ride: passengerRideView(ride, coRiders), matchOutcome });
   },
 
   async current(req: Request, res: Response) {

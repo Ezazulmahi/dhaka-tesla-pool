@@ -2,13 +2,14 @@ import type { PoolClient } from 'pg';
 import { pool, withTransaction } from '../db/pool';
 import { AppError, conflict, notFound } from '../lib/errors';
 import { settleFare } from '../domain/fare';
-import { assertPoolTransition, assertRideTransition, type PoolStatus } from '../domain/stateMachine';
+import { assertPoolTransition, type PoolStatus } from '../domain/stateMachine';
 import { vehicleModel, type VehicleRow } from '../models/vehicle.model';
 import { poolModel, type PoolRow } from '../models/pool.model';
 import { rideRequestModel } from '../models/rideRequest.model';
 import { rideEventModel } from '../models/rideEvent.model';
 import { userModel } from '../models/user.model';
 import { zoneModel } from '../models/zone.model';
+import { poolService } from './pool.service';
 
 /*
  * Lock order (prevents deadlocks): vehicle -> pool -> ride requests (by id).
@@ -76,8 +77,12 @@ export const driverService = {
     const freeSeats = active ? active.capacity - active.seats_taken : vehicle.capacity;
     if (freeSeats === 0) return { online: true, requests: [] };
 
-    const requests = await rideRequestModel.listWaitingInZone(pool, vehicle.current_zone_id, freeSeats);
-    return { online: true, requests };
+    const waiting = await rideRequestModel.listWaitingInZone(pool, vehicle.current_zone_id, freeSeats);
+    if (!active) return { online: true, requests: waiting };
+
+    // Already carrying Nusrat to Mohakhali? Only offer rides whose route fits alongside hers.
+    const fits = await Promise.all(waiting.map((r) => poolService.fitsPool(pool, active, r)));
+    return { online: true, requests: waiting.filter((_, i) => fits[i]) };
   },
 
   /** Accept a waiting ride: start a new pool, or add it to the one Jashim already has open. */
@@ -114,20 +119,14 @@ export const driverService = {
         });
       }
 
-      const claimed = await poolModel.claimSeats(tx, current.id, ride.seats);
-      if (!claimed) throw conflict('SEAT_UNAVAILABLE', `Not enough free seats in ${vehicle.name}`);
-
-      assertRideTransition(ride.status, 'MATCHED');
-      await rideRequestModel.transition(tx, ride.id, 'REQUESTED', 'MATCHED', { pool_id: current.id });
-      await rideEventModel.record(tx, {
-        rideRequestId: ride.id,
-        poolId: current.id,
-        actorId: driverId,
-        type: 'RIDE_MATCHED',
-        from: 'REQUESTED',
-        to: 'MATCHED',
-        details: { via: 'DRIVER_ACCEPT', seatsTaken: claimed.seats_taken, capacity: claimed.capacity },
-      });
+      // Same seat-allocation path as passenger auto-matching (capacity + route, under the pool lock).
+      const result = await poolService.tryJoin(tx, current.id, ride, { actorId: driverId, via: 'DRIVER_ACCEPT' });
+      if (!result.joined) {
+        if (result.reason === 'INCOMPATIBLE') {
+          throw conflict('ROUTE_INCOMPATIBLE', "This passenger's destination is too far from your other drop-offs");
+        }
+        throw conflict('SEAT_UNAVAILABLE', `Not enough free seats in ${vehicle.name}`);
+      }
       return current.id;
     });
     return this.poolForDriver(driverId, poolId);
