@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { logger } from './lib/logger';
 import { pool } from './db/pool';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
+import { apiRoutes } from './routes';
 
 export function createApp() {
   const app = express();
@@ -36,6 +37,8 @@ export function createApp() {
       res.status(503).json({ status: 'degraded', db: 'unreachable' });
     }
   });
+
+  app.use('/api', apiRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
