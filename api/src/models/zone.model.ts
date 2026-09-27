@@ -25,4 +25,22 @@ export const zoneModel = {
     );
     return row?.distance_m ?? null;
   },
+
+  /**
+   * Distances from one zone to several others, as a lookup function for the
+   * matching rule. Same zone = 0; an unknown pair counts as infinitely far.
+   */
+  async distanceLookupFrom(db: Db, fromZoneId: number, toZoneIds: number[]) {
+    const rows = await queryRows<{ to_zone_id: number; distance_m: number }>(
+      db,
+      'SELECT to_zone_id, distance_m FROM zone_distances WHERE from_zone_id = $1 AND to_zone_id = ANY($2::smallint[])',
+      [fromZoneId, toZoneIds],
+    );
+    const byZone = new Map(rows.map((r) => [r.to_zone_id, r.distance_m]));
+    return (from: number, to: number) => {
+      if (from === to) return 0;
+      const other = from === fromZoneId ? to : from;
+      return byZone.get(other) ?? Number.POSITIVE_INFINITY;
+    };
+  },
 };
