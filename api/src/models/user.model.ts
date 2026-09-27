@@ -30,11 +30,12 @@ export const userModel = {
     ) as Promise<UserRow>;
   },
 
-  /** Debit the TeslaPay wallet. The CHECK (>= 0) constraint refuses overdrafts. */
-  debitWallet(db: Db, id: string, amountPaisa: number) {
+  /** Conditional debit: returns null (and changes nothing) if the balance is too low. */
+  debitWalletIfSufficient(db: Db, id: string, amountPaisa: number) {
     return queryOne<UserRow>(
       db,
-      'UPDATE users SET wallet_balance_paisa = wallet_balance_paisa - $2 WHERE id = $1 RETURNING *',
+      `UPDATE users SET wallet_balance_paisa = wallet_balance_paisa - $2
+        WHERE id = $1 AND wallet_balance_paisa >= $2 RETURNING *`,
       [id, amountPaisa],
     );
   },
