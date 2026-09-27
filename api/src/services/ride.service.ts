@@ -7,6 +7,7 @@ import { userModel } from '../models/user.model';
 import { rideRequestModel, type RideDetailRow } from '../models/rideRequest.model';
 import { rideEventModel } from '../models/rideEvent.model';
 import { poolModel } from '../models/pool.model';
+import { poolService } from './pool.service';
 import type { CreateRideInput, EstimateInput } from '../validators/ride.validators';
 
 export async function requireDistance(db: Db, from: number, to: number) {
@@ -35,7 +36,7 @@ export const rideService = {
       throw conflict('ACTIVE_RIDE_EXISTS', 'You already have an active ride', { rideId: existing.id });
     }
 
-    const rideId = await withTransaction(async (tx) => {
+    const { rideId, outcome } = await withTransaction(async (tx) => {
       const distanceM = await requireDistance(tx, input.pickupZoneId, input.dropoffZoneId);
       const quote = quoteFare(distanceM, input.seats);
 
@@ -66,10 +67,13 @@ export const rideService = {
         to: 'REQUESTED',
         details: { seats: ride.seats, estimatedFarePaisa: ride.estimated_fare_paisa },
       });
-      return ride.id;
+
+      // Same transaction: either Nusrat is in a Tesla or she is waiting, never half-way.
+      const outcome = await poolService.autoMatch(tx, ride);
+      return { rideId: ride.id, outcome };
     });
 
-    return this.getForPassenger(passengerId, rideId);
+    return { ...(await this.getForPassenger(passengerId, rideId)), matchOutcome: outcome };
   },
 
   async getForPassenger(passengerId: string, rideId: string) {
