@@ -133,6 +133,27 @@ export const rideRequestModel = {
     );
   },
 
+  /** Driver feed: waiting rides in a pickup zone that fit in the free seats, oldest first. */
+  listWaitingInZone(db: Db, zoneId: number, maxSeats: number) {
+    return queryRows<RideDetailRow>(
+      db,
+      `${DETAIL_SELECT}
+        WHERE r.status = 'REQUESTED' AND r.pickup_zone_id = $1 AND r.seats <= $2
+        ORDER BY r.created_at
+        LIMIT 50`,
+      [zoneId, maxSeats],
+    );
+  },
+
+  /** Lock every ride in a pool in a stable order (by id) so concurrent writers can't deadlock. */
+  lockByPool(db: Db, poolId: string, statuses: RideStatus[]) {
+    return queryRows<RideRequestRow>(
+      db,
+      'SELECT * FROM ride_requests WHERE pool_id = $1 AND status = ANY($2::ride_status[]) ORDER BY id FOR UPDATE',
+      [poolId, statuses],
+    );
+  },
+
   /**
    * Guarded status change: only succeeds if the row is still in `from`.
    * Returns null if someone else changed it first; the caller turns that into a 409.

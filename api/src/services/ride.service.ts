@@ -6,6 +6,7 @@ import { zoneModel } from '../models/zone.model';
 import { userModel } from '../models/user.model';
 import { rideRequestModel, type RideDetailRow } from '../models/rideRequest.model';
 import { rideEventModel } from '../models/rideEvent.model';
+import { poolModel } from '../models/pool.model';
 import type { CreateRideInput, EstimateInput } from '../validators/ride.validators';
 
 export async function requireDistance(db: Db, from: number, to: number) {
@@ -94,24 +95,49 @@ export const rideService = {
   /** Nusrat can cancel while she is waiting or matched, but not once Bullet has started moving. */
   async cancel(passengerId: string, rideId: string, reason?: string) {
     await withTransaction(async (tx) => {
+      // Lock order is pool -> ride (same as the driver's start/complete), so peek at
+      // the pool id first, lock the pool, then lock and re-read the ride.
+      const peek = await rideRequestModel.findById(tx, rideId);
+      if (!peek || peek.passenger_id !== passengerId) throw notFound('Ride');
+      const lockedPool = peek.pool_id ? await poolModel.findById(tx, peek.pool_id, { forUpdate: true }) : null;
+
       const ride = await rideRequestModel.findById(tx, rideId, { forUpdate: true });
-      if (!ride || ride.passenger_id !== passengerId) throw notFound('Ride');
+      if (!ride || ride.pool_id !== peek.pool_id) throw conflict('RIDE_CHANGED', 'This ride changed just now, please refresh');
       if (!CANCELLABLE_RIDE_STATUSES.includes(ride.status)) {
         assertRideTransition(ride.status, 'CANCELLED'); // throws INVALID_TRANSITION with from/to
         throw conflict('CANCEL_NOT_ALLOWED', 'This ride can no longer be cancelled');
       }
+
       const updated = await rideRequestModel.transition(tx, rideId, ride.status, 'CANCELLED', {
         cancel_reason: reason ?? 'Cancelled by passenger',
       });
       if (!updated) throw conflict('RIDE_CHANGED', 'This ride changed just now, please refresh');
       await rideEventModel.record(tx, {
         rideRequestId: rideId,
+        poolId: ride.pool_id,
         actorId: passengerId,
         type: 'RIDE_CANCELLED',
         from: ride.status,
         to: 'CANCELLED',
         details: { reason: reason ?? null },
       });
+
+      // Give the seats back to the Tesla. If nobody is left, the trip is cancelled
+      // so Jashim isn't driving to Banani for no one.
+      if (lockedPool && ride.status === 'MATCHED') {
+        const after = await poolModel.releaseSeats(tx, lockedPool.id, ride.seats);
+        if (after.seats_taken === 0) {
+          await poolModel.transition(tx, after.id, after.status, 'CANCELLED');
+          await rideEventModel.record(tx, {
+            poolId: after.id,
+            actorId: passengerId,
+            type: 'POOL_CANCELLED',
+            from: after.status,
+            to: 'CANCELLED',
+            details: { reason: 'Every passenger cancelled' },
+          });
+        }
+      }
     });
     return this.getForPassenger(passengerId, rideId);
   },
