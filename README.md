@@ -4,9 +4,11 @@
 
 [![CI](https://github.com/Ezazulmahi/dhaka-tesla-pool/actions/workflows/ci.yml/badge.svg)](https://github.com/Ezazulmahi/dhaka-tesla-pool/actions/workflows/ci.yml)
 
-<!-- TODO(owner): replace both placeholders below before submitting. -->
+<!-- TODO(owner): replace the video placeholder below before submitting. -->
 **🎥 Demo video (6 min):** _link to be added_
-**🌐 Live demo:** _not deployed yet: see [Deployment](#deployment)_
+**🌐 Live demo:** **https://dhaka-tesla-pool-theta.vercel.app** (demo logins below, password `bullet123`).
+The API runs on Render's free tier and sleeps when idle, so the first request after a
+quiet spell takes about a minute.
 
 8:41 AM, Banani Road 11. Nusrat books a ride to Mohakhali. Two minutes later Rafiq books
 Banani → Gulshan 1. Their routes overlap, so they share Jashim's three-seat Tesla,
@@ -360,7 +362,7 @@ stay as the safety net. See [docs/scaling.md](docs/scaling.md).
 | Tests | **Vitest + supertest against a real Postgres** | Jest; mocking the DB; Testcontainers | The risky behaviour is *in the database* (locks, constraints, races), so mocks would test nothing. Vitest is fast and TS-native. | Add Playwright end-to-end tests for the UI flows. |
 | Logging | **pino** (JSON, request ids, cookies redacted) | winston, console | Structured one-line logs, cheap, easy to ship later. | Add OpenTelemetry traces at scale. |
 | CI | **GitHub Actions** | GitLab CI, CircleCI | Free for public repos. Runs API tests on real Postgres, lint + build for web, and a **`docker compose up` smoke test**. | — |
-| Hosting | **Docker Compose** (anywhere) + **Render free blueprint** (`render.yaml`) | Vercel + Render + Neon, Fly.io, Railway | Free tier, deploys the same Dockerfiles, managed Postgres. | Paid tier or a cloud provider once the free-tier sleep and DB expiry hurt. |
+| Hosting | **Vercel** (web) + **Render** (API, Docker) + **Neon** (Postgres), all free; **Docker Compose** anywhere | All-in-one Render (web + API + DB), Fly.io, Railway | Each piece on the free host that fits it best: Vercel for Next.js, Render runs our Dockerfile unchanged, Neon's free Postgres doesn't expire. | When the API's idle sleep hurts demos or real users → a paid always-on instance, or one cloud provider. |
 
 ## Project structure
 
@@ -533,19 +535,39 @@ role) · `404 NOT_FOUND` (missing **or not yours**) · `409` business conflicts
 
 ## Deployment
 
-<!-- TODO(owner): after deploying, put the URL at the top of this README. -->
-The app is not publicly deployed yet: that needs an account on a hosting provider. The
-repo is ready for two free options:
+Live at **https://dhaka-tesla-pool-theta.vercel.app**. Everything is on free tiers and
+nothing is paid.
 
-- **Render (free tier, one blueprint).** In the Render dashboard choose *New → Blueprint*
-  and pick this repo. [`render.yaml`](render.yaml) creates Postgres, the API (Docker; it
-  migrates and seeds on start) and the web app. After the first deploy, set the web
-  service's `API_URL` to the API's public URL and redeploy the web service.
-  - Free services sleep after about 15 idle minutes, so the first request takes about 50 s.
-  - The free Postgres expires after 30 days. [Neon](https://neon.tech)'s free tier is a
-    drop-in `DATABASE_URL` alternative (add `?sslmode=require`).
-- **Any machine with Docker.** `docker compose up --build` is the reproducible deployment.
-  CI proves it on every push.
+```mermaid
+flowchart LR
+  B[Browser] -- HTTPS --> V["Vercel<br/>Next.js web (root dir: web)"]
+  V -- "/api/* proxy<br/>API_URL" --> R["Render (Ohio)<br/>API Docker image, free web service"]
+  R -- "TLS · DATABASE_URL" --> N[("Neon (AWS us-east-2)<br/>Postgres, free")]
+```
+
+| Piece | Host | How it's configured |
+|---|---|---|
+| Web (Next.js) | **Vercel** (Hobby) | Project root directory `web`. Env `API_URL=https://dhaka-tesla-pool-ngd0.onrender.com`, read at runtime by the proxy route. |
+| API (Express) | **Render** free web service, Docker, root dir `api`, region Ohio | Env: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`, `COOKIE_SECURE=true`, `RUN_SEED=true`, `SEED_PASSWORD`, `LOG_LEVEL`. Health check `/health`. Migrations + seed run on every start (idempotent). |
+| Database | **Neon** free Postgres, same US-East area as the API | *Direct* (non-pooler) connection string ending in `?sslmode=require`. The migration runner uses a session-level advisory lock, which a transaction pooler would break. |
+
+Why this split:
+- **Vercel** is the natural home for Next.js.
+- **Render** runs our API's existing Dockerfile unchanged.
+- **Neon** instead of Render Postgres: Render allows one free database per account, and
+  its free databases expire after 30 days. Neon's free tier doesn't expire.
+
+Reproduce it:
+1. **Neon:** create a project, copy the direct connection string, and keep only
+   `?sslmode=require` at the end.
+2. **Render:** either *New → Blueprint* with [`render.yaml`](render.yaml) and paste the
+   Neon URL when asked, or *New → Web Service* with the settings above.
+3. **Vercel:** import the repo with root directory `web` (or run `vercel deploy --prod`
+   inside `web/`), set `API_URL` to the Render URL, and deploy.
+
+Free-tier caveat: the Render API sleeps after about 15 idle minutes, and the first request
+then takes about a minute. **Any machine with Docker** is the fallback deployment:
+`docker compose up --build`, which CI checks on every push.
 
 ## Assumptions
 
