@@ -25,6 +25,11 @@ export function createApp() {
         return id;
       },
       autoLogging: { ignore: (req) => req.url === '/health' },
+      // One compact line per request; headers (and their cookies) stay out of the logs.
+      serializers: {
+        req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+        res: (res) => ({ statusCode: res.statusCode }),
+      },
     }),
   );
 
