@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/* Design tokens. Bangladesh-flag green as the brand, a restrained red for danger. */
+@theme inline {
+  --color-brand: #006a4e;
+  --color-brand-dark: #004d38;
+  --color-danger: #d62839;
+  --color-ink: #16201c;
+  --color-muted: #5f6b66;
+  --color-line: #e2e8e5;
+  --color-surface: #f4f7f5;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}

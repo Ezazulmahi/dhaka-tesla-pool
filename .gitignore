@@ -23,3 +23,6 @@ Thumbs.db
 
 # test output
 coverage/
+
+# local AI-assistant tooling config
+.claude/
