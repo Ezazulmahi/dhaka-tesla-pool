@@ -108,13 +108,28 @@ export function Badge({ tone = "neutral", children }: { tone?: BadgeTone; childr
   );
 }
 
-export function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+/**
+ * A labelled form field. Use `group` for button groups (e.g. seat pickers): a <label>
+ * wrapping several buttons would make every button's accessible name the label text.
+ */
+export function Field({
+  label,
+  error,
+  group = false,
+  children,
+}: {
+  label: string;
+  error?: string;
+  group?: boolean;
+  children: ReactNode;
+}) {
+  const Wrapper = group ? "div" : "label";
   return (
-    <label className="block">
+    <Wrapper className="block">
       <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
       {children}
       {error && <span className="mt-1 block text-xs text-danger">{error}</span>}
-    </label>
+    </Wrapper>
   );
 }
 

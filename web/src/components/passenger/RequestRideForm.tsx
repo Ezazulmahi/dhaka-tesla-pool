@@ -108,7 +108,7 @@ export function RequestRideForm({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Seats">
+          <Field label="Seats" group>
             <div className="flex gap-2" role="radiogroup" aria-label="Seats">
               {Array.from({ length: MAX_SEATS }, (_, i) => i + 1).map((n) => (
                 <button
@@ -127,7 +127,7 @@ export function RequestRideForm({
               ))}
             </div>
           </Field>
-          <Field label="Payment">
+          <Field label="Payment" group>
             <div className="flex gap-2" role="radiogroup" aria-label="Payment">
               {(["CASH", "TESLAPAY"] as const).map((m) => (
                 <button
