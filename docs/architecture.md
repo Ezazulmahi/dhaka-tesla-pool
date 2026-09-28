@@ -13,7 +13,7 @@ flowchart LR
   end
   subgraph Web["web/ : Next.js App Router (View)"]
     P["Pages + client components<br/>/passenger, /driver, /login"]
-    RW["/api/* rewrite<br/>(same-origin proxy)"]
+    RW["/api/* route handler<br/>(same-origin proxy)"]
   end
   subgraph API["api/ : Node.js + Express (Controller / Service / Model)"]
     R["Routes + middleware<br/>auth, zod validation, rate limit"]
@@ -34,9 +34,13 @@ flowchart LR
   MVP scale, matching is one indexed query and seat claiming is one transaction. Anything
   more would be complexity we can't justify yet (see [scaling.md](scaling.md) for when
   that changes).
-- **Same-origin proxy.** The browser only talks to the Next.js origin. Next rewrites
-  `/api/*` to the Express API, so the auth cookie is first-party, `httpOnly` and
-  `SameSite=Lax`. There's no CORS dance and no token in `localStorage`.
+- **Same-origin proxy.** The browser only talks to the Next.js origin. A catch-all route
+  handler (`web/src/app/api/[...path]/route.ts`) forwards `/api/*` to the Express API, so
+  the auth cookie is first-party, `httpOnly` and `SameSite=Lax`. There's no CORS dance and
+  no token in `localStorage`.
+  - *Changed during implementation:* the first design used `next.config` rewrites, but
+    those are resolved at **build time** and would bake the API URL into the Docker image.
+    The route handler reads `API_URL` per request.
 - **Polling, not WebSockets.** Screens refresh ride/pool state every 3 seconds. Rides
   change state on a scale of minutes, so a 3-second delay is fine, and polling survives
   free-tier hosts that sleep and drop sockets.

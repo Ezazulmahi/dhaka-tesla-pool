@@ -8,7 +8,7 @@ import { cx } from "./ui";
 
 export function Logo() {
   return (
-    <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-ink">
+    <Link href="/" className="flex shrink-0 items-center gap-2 text-sm font-bold tracking-tight whitespace-nowrap text-ink sm:text-base">
       <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-brand text-sm text-white">
         ⚡
       </span>
@@ -31,7 +31,7 @@ export function AppHeader({ user, onLogout }: { user?: User; onLogout?: () => vo
 
   return (
     <header className="sticky top-0 z-10 border-b border-line bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3">
+      <div className="mx-auto flex max-w-3xl items-center justify-between gap-2 px-4 py-3">
         <Logo />
         {user && (
           <div className="flex items-center gap-1 text-sm">
@@ -41,7 +41,7 @@ export function AppHeader({ user, onLogout }: { user?: User; onLogout?: () => vo
                   key={l.href}
                   href={l.href}
                   className={cx(
-                    "rounded-lg px-3 py-1.5 font-medium",
+                    "rounded-lg px-2 py-1.5 font-medium sm:px-3",
                     pathname === l.href ? "bg-brand/10 text-brand-dark" : "text-muted hover:text-ink",
                   )}
                 >
@@ -55,7 +55,7 @@ export function AppHeader({ user, onLogout }: { user?: User; onLogout?: () => vo
                 <div className="text-xs text-muted">TeslaPay {taka(user.walletBalancePaisa)}</div>
               )}
             </div>
-            <button onClick={onLogout} className="ml-2 rounded-lg px-3 py-1.5 font-medium text-muted hover:bg-surface hover:text-ink">
+            <button onClick={onLogout} className="ml-1 rounded-lg px-2 py-1.5 font-medium whitespace-nowrap text-muted hover:bg-surface hover:text-ink sm:ml-2 sm:px-3">
               Sign out
             </button>
           </div>
