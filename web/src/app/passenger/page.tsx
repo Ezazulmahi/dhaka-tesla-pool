@@ -59,7 +59,8 @@ export default function PassengerPage() {
     <PageShell user={session.user} onLogout={logout}>
       {current.error && <ErrorBanner message={current.error.message} onRetry={current.refresh} />}
 
-      {outcome && ride && <Notice tone={OUTCOME_MESSAGE[outcome].tone}>{OUTCOME_MESSAGE[outcome].text}</Notice>}
+      {/* The booking outcome only matters until the ride moves on (e.g. waiting -> matched). */}
+      {outcome && ride && (outcome === "JOINED_POOL" ? ride.status === "MATCHED" : ride.status === "REQUESTED") && <Notice tone={OUTCOME_MESSAGE[outcome].tone}>{OUTCOME_MESSAGE[outcome].text}</Notice>}
 
       {current.loading ? (
         <PageLoader label="Loading your ride…" />
