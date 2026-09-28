@@ -4,8 +4,7 @@
 
 [![CI](https://github.com/Ezazulmahi/dhaka-tesla-pool/actions/workflows/ci.yml/badge.svg)](https://github.com/Ezazulmahi/dhaka-tesla-pool/actions/workflows/ci.yml)
 
-<!-- TODO(owner): replace the video placeholder below before submitting. -->
-**🎥 Demo video (6 min):** _link to be added_
+**🎥 Demo video (6 min):** **[Watch on Google Drive](https://drive.google.com/drive/folders/1XIYpNjgtwqEb4xqWDM__qA7-e17Bb17A?usp=sharing)**
 **🌐 Live demo:** **https://dhaka-tesla-pool-theta.vercel.app** (demo logins below, password `bullet123`).
 The API runs on Render's free tier and sleeps when idle, so the first request after a
 quiet spell takes about a minute.
