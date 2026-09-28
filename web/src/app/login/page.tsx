@@ -100,7 +100,12 @@ export default function LoginPage() {
                   {a.phone} · {a.note}
                 </div>
               </div>
-              <Button variant="secondary" disabled={submitting} onClick={() => void signIn(a.phone, DEMO_PASSWORD)}>
+              <Button
+                variant="secondary"
+                aria-label={`Sign in as ${a.name}`}
+                disabled={submitting}
+                onClick={() => void signIn(a.phone, DEMO_PASSWORD)}
+              >
                 Sign in
               </Button>
             </li>
