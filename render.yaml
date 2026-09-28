@@ -1,0 +1,47 @@
+# Render Blueprint (free tier): New > Blueprint > pick this repo.
+# Creates Postgres, the API (Docker, migrates + seeds on start) and the web app (Docker).
+# After the first deploy, set the web service's API_URL to the API's public URL,
+# e.g. https://dhaka-tesla-pool-api.onrender.com, and redeploy the web service.
+# Free-tier caveats: services sleep after ~15 min idle (first request ~50 s),
+# and the free Postgres instance expires after 30 days (Neon free is the fallback).
+
+databases:
+  - name: dhaka-tesla-pool-db
+    plan: free
+    databaseName: dhaka_tesla_pool
+    user: tesla
+
+services:
+  - type: web
+    name: dhaka-tesla-pool-api
+    runtime: docker
+    plan: free
+    rootDir: api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dhaka-tesla-pool-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: RUN_SEED
+        value: "true"
+      - key: SEED_PASSWORD
+        value: bullet123
+
+  - type: web
+    name: dhaka-tesla-pool-web
+    runtime: docker
+    plan: free
+    rootDir: web
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /login
+    envVars:
+      - key: API_URL
+        sync: false
