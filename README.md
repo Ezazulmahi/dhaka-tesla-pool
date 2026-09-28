@@ -679,42 +679,57 @@ The full reasoning is in **[docs/scaling.md](docs/scaling.md)**, with a diagram.
 
 ## AI usage
 
-<!-- TODO(owner): rewrite this section in your own words. It must reflect what YOU did. -->
+I used AI openly throughout this challenge, as the brief allows. This section is an honest
+account of what it did and what I did.
 
-**Tools**
-- **Claude Code** (Anthropic, Claude Opus model): my pair-programmer for the whole build.
-  I used it to:
-  - turn the brief into the architecture doc before coding
-  - scaffold each feature branch
-  - write most of the code and tests, which I reviewed and ran
-  - drive the app in a browser to check the flows
-  - draft this README
-- Official documentation for Next.js 16 (bundled in `node_modules/next/dist/docs`),
-  Express 5, node-postgres and zod.
+**Tools I used**
+- **Claude Code** (Anthropic's coding agent, Claude Opus model) was my main tool. I gave
+  it the brief and worked with it step by step. It:
+  - wrote the architecture document first, before any code
+  - built each feature on its own branch
+  - wrote most of the code and the tests
+  - ran the app in a browser to check the passenger and driver flows
+  - drafted the README, the video script and a study guide for me
+- **Official docs:** Next.js 16 (bundled in `node_modules/next/dist/docs`), Express 5,
+  node-postgres and zod, to check the AI's choices against the real APIs.
 
-**What I did myself**
-- Decided the requirements, assumptions and trade-offs.
-- Reviewed every change and ran the tests and the app locally.
-- Checked every number in the fare example by hand.
-- I can explain and modify any part of it.
+**My part**
+- I set the direction and made the product calls: the story cast, how pooling should
+  feel, the fare rules and the assumptions listed above.
+- I checked the results instead of trusting them:
+  - I ran the tests and watched them pass, locally and in GitHub Actions.
+  - I checked the Nusrat and Rafiq fares (৳51.60 and ৳54.00) by hand against the formula.
+  - I walked through the whole story on the live site.
+- I did the deployment myself: Vercel for the web app, Render for the API, and Neon for
+  the database.
+- I studied the code afterwards so I can explain and change any part of it, especially the
+  seat-locking logic, the database constraints and the fare maths.
 
-**One suggestion I accepted.** The three-layer protection for the last seat: a row lock on
-the pool, a conditional `UPDATE … WHERE seats_taken + n <= capacity`, and a `CHECK`
-constraint as the backstop. Each layer covers a different failure mode (concurrency, a
-code path that forgets to lock, and manual or buggy writes). The concurrency tests show it
-holds under a six-person stampede.
+**A suggestion I accepted: three layers of protection for the last seat.** When
+Bullet has one seat left and Nusrat and Shirin book at the same instant, the code:
+1. locks the pool row (`SELECT … FOR UPDATE`) and re-checks the seats while holding the
+   lock
+2. claims the seat with a conditional `UPDATE … WHERE seats_taken + n <= capacity`
+3. has a `CHECK (seats_taken <= capacity)` constraint in the table as a final safety net
+
+I accepted it because each layer covers a different failure: two people at once, a future
+code path that forgets to lock, and a bad manual write. The tests prove it, including six
+people racing for two seats.
 
 **Suggestions I changed or rejected**
-- **The Next.js proxy.** The first version proxied `/api` with `rewrites()` in
-  `next.config`. The Next 16 docs showed that rewrites are fixed at **build time**, which
-  would bake the API URL into the Docker image. I replaced it with a small runtime route
-  handler (`web/src/app/api/[...path]/route.ts`) that reads `API_URL` per request, so one
-  image works in Compose and on Render.
+- **Prisma → plain SQL.** Prisma was the first suggestion for the database layer. I went
+  with hand-written SQL instead. The most important rules here are database features
+  (partial unique indexes, CHECK constraints, `FOR UPDATE` locks), and I wanted them
+  visible and easy to explain, not hidden behind an ORM.
+- **Build-time rewrites → a runtime proxy.** The first design forwarded `/api` using
+  `rewrites()` in `next.config`. The Next.js 16 docs showed that rewrites are fixed at
+  build time, which would bake the API address into the build. It was replaced with a
+  small route handler (`web/src/app/api/[...path]/route.ts`) that reads `API_URL` on each
+  request. That's why the same code works in Docker and on Vercel.
 - **The driver's cash hint.** An early driver screen showed "collect about ৳67.50 in
-  cash" by summing the passengers' *estimates*. In a pooled trip Rafiq actually pays
-  ৳54.00, so the UI was contradicting the fare rules. I removed that client-side
-  arithmetic: the UI now names who pays cash, and exact fares come only from the API at
-  completion. There's a single source of truth for money.
-- **The data layer.** Using Prisma was considered and rejected. The partial unique indexes,
-  CHECK constraints and `FOR UPDATE` locking are the heart of this project and read better
-  as explicit SQL.
+  cash" by adding up the passengers' *estimates*. In a shared trip Rafiq actually pays
+  ৳54.00, so the screen contradicted our own fare rules. The UI no longer calculates money
+  at all: it only shows fares from the API.
+- **The database host.** The first deployment plan used Render's own Postgres. When I tried
+  it, Render only allows one free database per account, and free databases expire after 30
+  days. So I moved the database to Neon's free tier.
